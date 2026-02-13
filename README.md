@@ -14,6 +14,7 @@ A Codex/Claude skill that enables aggressive web research via your OpenAI-compat
 - 🔍 Real-time web search through Grok API
 - 📋 Structured JSON output with `content` + `sources`
 - 🔗 Custom API URL support (`api_url`) for non-standard gateway paths
+- 🎚️ Search depth profiles mapped to different models (`fast`/`thinking`/`heavy`)
 - 🔐 Secure config with local override support
 - 🌍 Environment variable configuration
 - ⚡ Easy one-click installation
@@ -66,6 +67,12 @@ C:\Users\<YourUsername>\.codex\skills\grok-search\config.json
   "api_url": "http://localhost:8080/v1/chat/completions",
   "base_url": "http://localhost:8080",
   "api_key": "YOUR_API_KEY",
+  "depth": "thinking",
+  "depth_models": {
+    "fast": "grok-4.1-fast",
+    "thinking": "grok-4.1-thinking",
+    "heavy": "grok-4-heavy"
+  },
   "model": "grok-4",
   "timeout_seconds": 60,
   "extra_body": {},
@@ -78,7 +85,9 @@ C:\Users\<YourUsername>\.codex\skills\grok-search\config.json
 | `api_url` | Optional full API URL. Supports host, `/v1`, or `/v1/chat/completions` |
 | `base_url` | Base URL fallback (auto appends `/v1/chat/completions`) |
 | `api_key` | Your API key (**DO NOT commit to Git**). Optional when server auth is disabled |
-| `model` | Model name (e.g., `grok-4`) |
+| `depth` | Optional depth selector key (e.g., `fast`, `thinking`, `heavy`) |
+| `depth_models` | Depth-to-model mapping object, fully customizable in config |
+| `model` | Fallback model when depth is not set (e.g., `grok-4`) |
 | `timeout_seconds` | Request timeout in seconds |
 | `extra_body` | Additional request body parameters |
 | `extra_headers` | Additional HTTP headers |
@@ -89,10 +98,18 @@ C:\Users\<YourUsername>\.codex\skills\grok-search\config.json
 $env:GROK_API_URL="http://localhost:8080/v1/chat/completions"
 $env:GROK_BASE_URL="http://localhost:8080"
 $env:GROK2API_API_KEY="YOUR_API_KEY"
+$env:GROK_SEARCH_DEPTH="thinking"
 $env:GROK_MODEL="grok-4"
 ```
 
 Key env fallback order: `GROK_API_KEY` -> `GROK2API_API_KEY`.
+
+Model resolution priority:
+1. `--model` / `GROK_MODEL` / `GROK2API_MODEL`
+2. `--depth` / `GROK_SEARCH_DEPTH` / `GROK_DEPTH` / `config.depth` -> `config.depth_models`
+3. `config.model` (fallback)
+
+Tip: some models (for example `grok-4-heavy`) may require higher-tier accounts/tokens in your `grok2api` backend.
 
 #### Option D: Local `grok2api` Quick Connect
 
@@ -101,7 +118,7 @@ If your `grok2api` runs on `localhost:8080`:
 ```powershell
 $env:GROK_BASE_URL="http://localhost:8080"
 $env:GROK2API_API_KEY="<your key>"
-python scripts/grok_search.py --query "What changed in FastAPI recently?"
+python scripts/grok_search.py --depth fast --query "What changed in FastAPI recently?"
 ```
 
 #### 🔒 Secure API Key Storage
@@ -119,7 +136,7 @@ For security, create `config.local.json` in the same directory (gitignored):
 #### Direct Command Line
 
 ```bash
-python scripts/grok_search.py --query "What is the latest version of Node.js?"
+python scripts/grok_search.py --depth thinking --query "What is the latest version of Node.js?"
 ```
 
 #### Output Format
@@ -185,6 +202,7 @@ grok-search/
 - 🔍 通过 Grok API 进行实时网络搜索
 - 📋 结构化 JSON 输出，包含 `content` + `sources`
 - 🔗 支持自定义 API URL（`api_url`），兼容非标准网关路径
+- 🎚️ 支持搜索深度档位映射模型（`fast`/`thinking`/`heavy`）
 - 🔐 安全配置，支持本地覆盖
 - 🌍 支持环境变量配置
 - ⚡ 一键安装
@@ -237,6 +255,12 @@ C:\Users\<你的用户名>\.codex\skills\grok-search\config.json
   "api_url": "http://localhost:8080/v1/chat/completions",
   "base_url": "http://localhost:8080",
   "api_key": "YOUR_API_KEY",
+  "depth": "thinking",
+  "depth_models": {
+    "fast": "grok-4.1-fast",
+    "thinking": "grok-4.1-thinking",
+    "heavy": "grok-4-heavy"
+  },
   "model": "grok-4",
   "timeout_seconds": 60,
   "extra_body": {},
@@ -249,7 +273,9 @@ C:\Users\<你的用户名>\.codex\skills\grok-search\config.json
 | `api_url` | 可选的完整 API 地址。支持 host、`/v1` 或 `/v1/chat/completions` |
 | `base_url` | 回退基础地址（会自动拼接 `/v1/chat/completions`） |
 | `api_key` | 你的 API 密钥（**不要提交到 Git**）。服务端关闭鉴权时可留空 |
-| `model` | 模型名称（如 `grok-4`） |
+| `depth` | 可选深度档位（如 `fast`、`thinking`、`heavy`） |
+| `depth_models` | 深度到模型的映射对象，可在配置中完全自定义 |
+| `model` | 未设置深度时的兜底模型（如 `grok-4`） |
 | `timeout_seconds` | 请求超时时间（秒） |
 | `extra_body` | 额外的请求体参数 |
 | `extra_headers` | 额外的 HTTP 请求头 |
@@ -260,10 +286,18 @@ C:\Users\<你的用户名>\.codex\skills\grok-search\config.json
 $env:GROK_API_URL="http://localhost:8080/v1/chat/completions"
 $env:GROK_BASE_URL="http://localhost:8080"
 $env:GROK2API_API_KEY="YOUR_API_KEY"
+$env:GROK_SEARCH_DEPTH="thinking"
 $env:GROK_MODEL="grok-4"
 ```
 
 API Key 环境变量回退顺序：`GROK_API_KEY` -> `GROK2API_API_KEY`。
+
+模型解析优先级：
+1. `--model` / `GROK_MODEL` / `GROK2API_MODEL`
+2. `--depth` / `GROK_SEARCH_DEPTH` / `GROK_DEPTH` / `config.depth` -> `config.depth_models`
+3. `config.model`（兜底）
+
+提示：部分模型（例如 `grok-4-heavy`）可能要求你在 `grok2api` 后端使用更高权限的账号或可用 Token。
 
 #### 方式 D：本地 `grok2api` 快速接入
 
@@ -272,7 +306,7 @@ API Key 环境变量回退顺序：`GROK_API_KEY` -> `GROK2API_API_KEY`。
 ```powershell
 $env:GROK_BASE_URL="http://localhost:8080"
 $env:GROK2API_API_KEY="<你的 key>"
-python scripts/grok_search.py --query "FastAPI 最近有什么更新？"
+python scripts/grok_search.py --depth fast --query "FastAPI 最近有什么更新？"
 ```
 
 #### 🔒 安全存储 API 密钥
@@ -290,7 +324,7 @@ python scripts/grok_search.py --query "FastAPI 最近有什么更新？"
 #### 直接命令行调用
 
 ```bash
-python scripts/grok_search.py --query "Node.js 最新版本是什么？"
+python scripts/grok_search.py --depth thinking --query "Node.js 最新版本是什么？"
 ```
 
 #### 输出格式

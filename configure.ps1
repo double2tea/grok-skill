@@ -44,6 +44,31 @@ if (-not $apiKeyDefault) {
   }
 }
 $apiKey = Read-Default 'Grok API key (optional if server auth disabled)' ($apiKeyDefault)
+
+$depth = Read-Default 'Search depth (optional: fast/thinking/heavy)' ($existing.depth)
+
+$depthModels = [ordered]@{
+  fast = 'grok-4.1-fast'
+  thinking = 'grok-4.1-thinking'
+  heavy = 'grok-4-heavy'
+}
+
+if ($existing -and $existing.depth_models) {
+  if ($existing.depth_models -is [System.Collections.IDictionary]) {
+    foreach ($entry in $existing.depth_models.GetEnumerator()) {
+      $k = [string]$entry.Key
+      $v = [string]$entry.Value
+      if ($k -and $v) { $depthModels[$k] = $v }
+    }
+  } else {
+    foreach ($prop in $existing.depth_models.PSObject.Properties) {
+      $k = [string]$prop.Name
+      $v = [string]$prop.Value
+      if ($k -and $v) { $depthModels[$k] = $v }
+    }
+  }
+}
+
 $model = Read-Default 'Model' ($existing.model)
 if (-not $model) { $model = 'grok-4' }
 
@@ -54,6 +79,8 @@ $config = [ordered]@{
   api_url = $apiUrl
   base_url = $baseUrl
   api_key = $apiKey
+  depth = $depth
+  depth_models = $depthModels
   model = $model
   timeout_seconds = [int]$timeout
   extra_body = @{}

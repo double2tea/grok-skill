@@ -34,13 +34,14 @@ If you prefer env vars:
 $env:GROK_API_URL="http://localhost:8080/v1/chat/completions"
 $env:GROK_BASE_URL="http://localhost:8080"
 $env:GROK2API_API_KEY="YOUR_API_KEY"
+$env:GROK_SEARCH_DEPTH="thinking"
 $env:GROK_MODEL="grok-4"
 ```
 
 ### Run
 
 ```bash
-python scripts/grok_search.py --query "What changed in X recently?"
+python scripts/grok_search.py --depth thinking --query "What changed in X recently?"
 ```
 
 ## Output
@@ -57,5 +58,9 @@ Prints JSON to stdout:
   1. `GROK_API_URL` / `--api-url` / `config.api_url` (full API URL; supports host, `/v1`, or `/v1/chat/completions`)
   2. `GROK_BASE_URL` / `--base-url` / `config.base_url` (auto appends `/v1/chat/completions`)
 - API key env fallback: `GROK_API_KEY` or `GROK2API_API_KEY` (request still works without key when server auth is disabled).
-- You can override model via `--model` or `GROK_MODEL` (default `grok-4`).
+- Model/depth priority:
+  1. `--model` / `GROK_MODEL` / `GROK2API_MODEL`
+  2. `--depth` / `GROK_SEARCH_DEPTH` / `GROK_DEPTH` / `config.depth` -> `config.depth_models`
+  3. `config.model` (fallback, default `grok-4`)
+- Default depth map in config: `fast -> grok-4.1-fast`, `thinking -> grok-4.1-thinking`, `heavy -> grok-4-heavy`.
 - If your 2api requires custom flags to enable web search, pass them via `--extra-body-json` / `GROK_EXTRA_BODY_JSON`.

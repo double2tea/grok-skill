@@ -9,6 +9,13 @@ import urllib.parse
 import urllib.request
 from typing import Any
 
+DEFAULT_MODEL = "grok-4"
+DEFAULT_DEPTH_MODELS: dict[str, str] = {
+    "fast": "grok-4.1-fast",
+    "thinking": "grok-4.1-thinking",
+    "heavy": "grok-4-heavy",
+}
+
 
 def _compact_json(data: Any) -> str:
     return json.dumps(data, ensure_ascii=False, separators=(",", ":"), sort_keys=False)
@@ -71,6 +78,32 @@ def _normalize_api_url_value(api_url: str) -> str:
     if api_url.upper() in {item.upper() for item in placeholder}:
         return ""
     return api_url
+
+
+def _normalize_depth_name(depth: str) -> str:
+    depth = depth.strip().lower().replace("_", "-").replace(" ", "-")
+    aliases = {
+        "quick": "fast",
+        "shallow": "fast",
+        "balanced": "thinking",
+        "standard": "thinking",
+        "deep": "heavy",
+        "max": "heavy",
+    }
+    return aliases.get(depth, depth)
+
+
+def _load_depth_models(raw_value: Any) -> dict[str, str]:
+    merged = dict(DEFAULT_DEPTH_MODELS)
+    if not isinstance(raw_value, dict):
+        return merged
+
+    for key, value in raw_value.items():
+        depth = _normalize_depth_name(str(key))
+        model = str(value).strip()
+        if depth and model:
+            merged[depth] = model
+    return merged
 
 
 def _load_json_file(path: str) -> dict[str, Any]:
@@ -208,6 +241,7 @@ def main() -> int:
     parser.add_argument("--config", default="", help="Path to config JSON file.")
     parser.add_argument("--api-url", default="", help="Override full API URL. Accepts host, /v1, or /v1/chat/completions.")
     parser.add_argument("--base-url", default="", help="Override base URL.")
+    parser.add_argument("--depth", default="", help="Search depth key mapped to model (e.g. fast/thinking/heavy).")
     parser.add_argument("--api-key", default="", help="Override API key.")
     parser.add_argument("--model", default="", help="Override model.")
     parser.add_argument("--timeout-seconds", type=float, default=0.0, help="Override timeout (seconds).")
@@ -277,19 +311,41 @@ def main() -> int:
         or str(config.get("base_url") or "").strip()
     )
     request_url = _resolve_chat_completions_url(api_url=api_url, base_url=base_url)
+    depth_models = _load_depth_models(config.get("depth_models"))
+    raw_depth = (
+        args.depth.strip()
+        or os.environ.get("GROK_SEARCH_DEPTH", "").strip()
+        or os.environ.get("GROK_DEPTH", "").strip()
+        or str(config.get("depth") or "").strip()
+    )
+    depth = _normalize_depth_name(raw_depth) if raw_depth else ""
     api_key = _normalize_api_key(
         args.api_key.strip()
         or os.environ.get("GROK_API_KEY", "").strip()
         or os.environ.get("GROK2API_API_KEY", "").strip()
         or str(config.get("api_key") or "").strip()
     )
-    model = (
+    explicit_model = (
         args.model.strip()
         or os.environ.get("GROK_MODEL", "").strip()
         or os.environ.get("GROK2API_MODEL", "").strip()
-        or str(config.get("model") or "").strip()
-        or "grok-4"
     )
+    if explicit_model:
+        model = explicit_model
+        model_source = "explicit_model"
+    elif depth:
+        model = depth_models.get(depth, "")
+        if not model:
+            available_depths = ", ".join(sorted(depth_models.keys()))
+            sys.stderr.write(
+                f"Unknown depth '{raw_depth}'. Available depths: {available_depths}\n"
+                f"Config path: {config_path}\n"
+            )
+            return 2
+        model_source = f"depth:{depth}"
+    else:
+        model = str(config.get("model") or "").strip() or DEFAULT_MODEL
+        model_source = "config_or_default"
 
     timeout_seconds = args.timeout_seconds
     if not timeout_seconds:
@@ -342,7 +398,9 @@ def main() -> int:
             "config_path": config_path,
             "request_url": request_url,
             "base_url": base_url,
+            "depth": depth,
             "model": model,
+            "model_source": model_source,
             "elapsed_ms": int((time.time() - started) * 1000),
         }
         sys.stdout.write(_compact_json(out))
@@ -355,7 +413,9 @@ def main() -> int:
             "config_path": config_path,
             "request_url": request_url,
             "base_url": base_url,
+            "depth": depth,
             "model": model,
+            "model_source": model_source,
             "elapsed_ms": int((time.time() - started) * 1000),
         }
         sys.stdout.write(_compact_json(out))
@@ -401,7 +461,9 @@ def main() -> int:
         "config_path": config_path,
         "request_url": request_url,
         "base_url": base_url,
+        "depth": depth,
         "model": resp.get("model") or model,
+        "model_source": model_source,
         "content": content,
         "sources": sources,
         "raw": raw,

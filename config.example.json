@@ -2,6 +2,12 @@
   "api_url": "http://localhost:8080/v1/chat/completions",
   "base_url": "http://localhost:8080",
   "api_key": "YOUR_API_KEY",
+  "depth": "thinking",
+  "depth_models": {
+    "fast": "grok-4.1-fast",
+    "thinking": "grok-4.1-thinking",
+    "heavy": "grok-4-heavy"
+  },
   "model": "grok-4",
   "timeout_seconds": 60,
   "extra_body": {},
