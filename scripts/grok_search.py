@@ -156,16 +156,107 @@ def _coerce_json_object(text: str) -> dict[str, Any] | None:
     return None
 
 
+def _normalize_url_candidate(url: str) -> str:
+    candidate = str(url or "").strip()
+    if not candidate:
+        return ""
+    candidate = candidate.strip("`")
+    candidate = candidate.lstrip("(<[{\"'`（【「《")
+    candidate = candidate.rstrip(")>]}\"'`.,;:!?，。；：！？）】」》")
+    if not candidate.startswith(("http://", "https://")):
+        return ""
+    parsed = urllib.parse.urlparse(candidate)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return ""
+    return candidate
+
+
 def _extract_urls(text: str) -> list[str]:
-    urls = re.findall(r"https?://[^\s)\]}>\"']+", text)
+    urls = re.findall(r"https?://[^\s<>\"]+", text)
     seen: set[str] = set()
     out: list[str] = []
     for url in urls:
-        url = url.rstrip(".,;:!?'\"")
+        url = _normalize_url_candidate(url)
         if url and url not in seen:
             seen.add(url)
             out.append(url)
     return out
+
+
+def _collect_citation_urls(resp: dict[str, Any]) -> list[str]:
+    seen: set[str] = set()
+    out: list[str] = []
+
+    def push(url_like: Any) -> None:
+        normalized = _normalize_url_candidate(str(url_like or ""))
+        if normalized and normalized not in seen:
+            seen.add(normalized)
+            out.append(normalized)
+
+    def from_citation_item(item: Any) -> None:
+        if isinstance(item, str):
+            push(item)
+            return
+        if not isinstance(item, dict):
+            return
+        push(item.get("url"))
+        web_citation = item.get("web_citation")
+        if isinstance(web_citation, dict):
+            push(web_citation.get("url"))
+
+    top_citations = resp.get("citations")
+    if isinstance(top_citations, list):
+        for item in top_citations:
+            from_citation_item(item)
+
+    choice0 = (resp.get("choices") or [{}])[0]
+    message = choice0.get("message") or {}
+    if not isinstance(message, dict):
+        return out
+
+    msg_citations = message.get("citations")
+    if isinstance(msg_citations, list):
+        for item in msg_citations:
+            from_citation_item(item)
+
+    msg_annotations = message.get("annotations")
+    if isinstance(msg_annotations, list):
+        for annotation in msg_annotations:
+            from_citation_item(annotation)
+
+    msg_content = message.get("content")
+    if isinstance(msg_content, list):
+        for part in msg_content:
+            if not isinstance(part, dict):
+                continue
+            part_annotations = part.get("annotations")
+            if isinstance(part_annotations, list):
+                for annotation in part_annotations:
+                    from_citation_item(annotation)
+
+    return out
+
+
+def _upsert_source(
+    source_index: dict[str, dict[str, str]],
+    source_order: list[str],
+    *,
+    url: str,
+    title: str = "",
+    snippet: str = "",
+) -> None:
+    normalized = _normalize_url_candidate(url)
+    if not normalized:
+        return
+    if normalized not in source_index:
+        source_index[normalized] = {"url": normalized, "title": title, "snippet": snippet}
+        source_order.append(normalized)
+        return
+    current = source_index[normalized]
+    if title and not current.get("title"):
+        current["title"] = title
+    if snippet and not current.get("snippet"):
+        current["snippet"] = snippet
 
 
 def _load_json_env(var_name: str) -> dict[str, Any]:
@@ -430,7 +521,11 @@ def main() -> int:
         message = ""
 
     parsed = _coerce_json_object(message)
-    sources: list[dict[str, Any]] = []
+    source_index: dict[str, dict[str, str]] = {}
+    source_order: list[str] = []
+    for citation_url in _collect_citation_urls(resp):
+        _upsert_source(source_index, source_order, url=citation_url)
+
     content = ""
     raw = ""
 
@@ -440,20 +535,22 @@ def main() -> int:
         if isinstance(src, list):
             for item in src:
                 if isinstance(item, dict) and item.get("url"):
-                    sources.append(
-                        {
-                            "url": str(item.get("url")),
-                            "title": str(item.get("title") or ""),
-                            "snippet": str(item.get("snippet") or ""),
-                        }
+                    _upsert_source(
+                        source_index,
+                        source_order,
+                        url=str(item.get("url")),
+                        title=str(item.get("title") or ""),
+                        snippet=str(item.get("snippet") or ""),
                     )
-        if not sources:
+        if not source_order:
             for url in _extract_urls(content):
-                sources.append({"url": url, "title": "", "snippet": ""})
+                _upsert_source(source_index, source_order, url=url)
     else:
         raw = message
         for url in _extract_urls(message):
-            sources.append({"url": url, "title": "", "snippet": ""})
+            _upsert_source(source_index, source_order, url=url)
+
+    sources = [source_index[url] for url in source_order]
 
     out = {
         "ok": True,

@@ -139,6 +139,12 @@ For security, create `config.local.json` in the same directory (gitignored):
 python scripts/grok_search.py --depth thinking --query "What is the latest version of Node.js?"
 ```
 
+#### Quick Self-Test
+
+```bash
+python scripts/selftest.py
+```
+
 #### Output Format
 
 ```json
@@ -187,7 +193,8 @@ grok-search/
 ├── install.ps1        # Installation script
 ├── configure.ps1      # Interactive configuration script
 └── scripts/
-    └── grok_search.py # Main search script
+    ├── grok_search.py # Main search script
+    └── selftest.py    # Lightweight self-test
 ```
 
 ---
@@ -327,6 +334,12 @@ python scripts/grok_search.py --depth fast --query "FastAPI 最近有什么更�
 python scripts/grok_search.py --depth thinking --query "Node.js 最新版本是什么？"
 ```
 
+#### 快速自测
+
+```bash
+python scripts/selftest.py
+```
+
 #### 输出格式
 
 ```json
@@ -375,7 +388,8 @@ grok-search/
 ├── install.ps1        # 安装脚本
 ├── configure.ps1      # 交互式配置脚本
 └── scripts/
-    └── grok_search.py # 主搜索脚本
+    ├── grok_search.py # 主搜索脚本
+    └── selftest.py    # 轻量自测脚本
 ```
 
 ---

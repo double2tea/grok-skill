@@ -44,6 +44,12 @@ $env:GROK_MODEL="grok-4"
 python scripts/grok_search.py --depth thinking --query "What changed in X recently?"
 ```
 
+### Self-test
+
+```bash
+python scripts/selftest.py
+```
+
 ## Output
 
 Prints JSON to stdout:
@@ -63,4 +69,5 @@ Prints JSON to stdout:
   2. `--depth` / `GROK_SEARCH_DEPTH` / `GROK_DEPTH` / `config.depth` -> `config.depth_models`
   3. `config.model` (fallback, default `grok-4`)
 - Default depth map in config: `fast -> grok-4.1-fast`, `thinking -> grok-4.1-thinking`, `heavy -> grok-4-heavy`.
+- Source extraction: combines structured citations from API response + URL extraction fallback, with dedupe/cleanup.
 - If your 2api requires custom flags to enable web search, pass them via `--extra-body-json` / `GROK_EXTRA_BODY_JSON`.
