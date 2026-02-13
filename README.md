@@ -7,12 +7,13 @@
 <a name="english"></a>
 ## 🌐 English
 
-A Codex/Claude skill that enables aggressive web research via your OpenAI-compatible Grok endpoint (2api). Perfect for real-time information queries, version checking, and documentation lookup.
+A Codex/Claude skill that enables aggressive web research via your OpenAI-compatible Grok endpoint (2api), including local `grok2api` deployments.
 
 ### ✨ Features
 
 - 🔍 Real-time web search through Grok API
 - 📋 Structured JSON output with `content` + `sources`
+- 🔗 Custom API URL support (`api_url`) for non-standard gateway paths
 - 🔐 Secure config with local override support
 - 🌍 Environment variable configuration
 - ⚡ Easy one-click installation
@@ -62,9 +63,10 @@ C:\Users\<YourUsername>\.codex\skills\grok-search\config.json
 
 ```json
 {
-  "base_url": "https://your-grok-endpoint.example",
+  "api_url": "http://localhost:8080/v1/chat/completions",
+  "base_url": "http://localhost:8080",
   "api_key": "YOUR_API_KEY",
-  "model": "grok-2-latest",
+  "model": "grok-4",
   "timeout_seconds": 60,
   "extra_body": {},
   "extra_headers": {}
@@ -73,9 +75,10 @@ C:\Users\<YourUsername>\.codex\skills\grok-search\config.json
 
 | Field | Description |
 |-------|-------------|
-| `base_url` | Your Grok API endpoint URL |
-| `api_key` | Your API key (**DO NOT commit to Git**) |
-| `model` | Model name (e.g., `grok-2-latest`) |
+| `api_url` | Optional full API URL. Supports host, `/v1`, or `/v1/chat/completions` |
+| `base_url` | Base URL fallback (auto appends `/v1/chat/completions`) |
+| `api_key` | Your API key (**DO NOT commit to Git**). Optional when server auth is disabled |
+| `model` | Model name (e.g., `grok-4`) |
 | `timeout_seconds` | Request timeout in seconds |
 | `extra_body` | Additional request body parameters |
 | `extra_headers` | Additional HTTP headers |
@@ -83,9 +86,22 @@ C:\Users\<YourUsername>\.codex\skills\grok-search\config.json
 #### Option C: Environment Variables
 
 ```powershell
-$env:GROK_BASE_URL="https://your-grok-endpoint.example"
-$env:GROK_API_KEY="YOUR_API_KEY"
-$env:GROK_MODEL="grok-2-latest"
+$env:GROK_API_URL="http://localhost:8080/v1/chat/completions"
+$env:GROK_BASE_URL="http://localhost:8080"
+$env:GROK2API_API_KEY="YOUR_API_KEY"
+$env:GROK_MODEL="grok-4"
+```
+
+Key env fallback order: `GROK_API_KEY` -> `GROK2API_API_KEY`.
+
+#### Option D: Local `grok2api` Quick Connect
+
+If your `grok2api` runs on `localhost:8080`:
+
+```powershell
+$env:GROK_BASE_URL="http://localhost:8080"
+$env:GROK2API_API_KEY="<your key>"
+python scripts/grok_search.py --query "What changed in FastAPI recently?"
 ```
 
 #### 🔒 Secure API Key Storage
@@ -162,12 +178,13 @@ grok-search/
 <a name="中文"></a>
 ## 🌐 中文
 
-一个 Codex/Claude 技能插件，通过你的 OpenAI 兼容 Grok 接口（2api）实现激进的联网检索。适用于实时信息查询、版本检查和文档查找。
+一个 Codex/Claude 技能插件，通过你的 OpenAI 兼容 Grok 接口（2api）实现激进的联网检索，并支持本地部署的 `grok2api`。
 
 ### ✨ 功能特性
 
 - 🔍 通过 Grok API 进行实时网络搜索
 - 📋 结构化 JSON 输出，包含 `content` + `sources`
+- 🔗 支持自定义 API URL（`api_url`），兼容非标准网关路径
 - 🔐 安全配置，支持本地覆盖
 - 🌍 支持环境变量配置
 - ⚡ 一键安装
@@ -217,9 +234,10 @@ C:\Users\<你的用户名>\.codex\skills\grok-search\config.json
 
 ```json
 {
-  "base_url": "https://your-grok-endpoint.example",
+  "api_url": "http://localhost:8080/v1/chat/completions",
+  "base_url": "http://localhost:8080",
   "api_key": "YOUR_API_KEY",
-  "model": "grok-2-latest",
+  "model": "grok-4",
   "timeout_seconds": 60,
   "extra_body": {},
   "extra_headers": {}
@@ -228,9 +246,10 @@ C:\Users\<你的用户名>\.codex\skills\grok-search\config.json
 
 | 字段 | 说明 |
 |------|------|
-| `base_url` | 你的 Grok API 端点地址 |
-| `api_key` | 你的 API 密钥（**不要提交到 Git**） |
-| `model` | 模型名称（如 `grok-2-latest`） |
+| `api_url` | 可选的完整 API 地址。支持 host、`/v1` 或 `/v1/chat/completions` |
+| `base_url` | 回退基础地址（会自动拼接 `/v1/chat/completions`） |
+| `api_key` | 你的 API 密钥（**不要提交到 Git**）。服务端关闭鉴权时可留空 |
+| `model` | 模型名称（如 `grok-4`） |
 | `timeout_seconds` | 请求超时时间（秒） |
 | `extra_body` | 额外的请求体参数 |
 | `extra_headers` | 额外的 HTTP 请求头 |
@@ -238,9 +257,22 @@ C:\Users\<你的用户名>\.codex\skills\grok-search\config.json
 #### 方式 C：环境变量
 
 ```powershell
-$env:GROK_BASE_URL="https://your-grok-endpoint.example"
-$env:GROK_API_KEY="YOUR_API_KEY"
-$env:GROK_MODEL="grok-2-latest"
+$env:GROK_API_URL="http://localhost:8080/v1/chat/completions"
+$env:GROK_BASE_URL="http://localhost:8080"
+$env:GROK2API_API_KEY="YOUR_API_KEY"
+$env:GROK_MODEL="grok-4"
+```
+
+API Key 环境变量回退顺序：`GROK_API_KEY` -> `GROK2API_API_KEY`。
+
+#### 方式 D：本地 `grok2api` 快速接入
+
+如果你的 `grok2api` 运行在 `localhost:8080`：
+
+```powershell
+$env:GROK_BASE_URL="http://localhost:8080"
+$env:GROK2API_API_KEY="<你的 key>"
+python scripts/grok_search.py --query "FastAPI 最近有什么更新？"
 ```
 
 #### 🔒 安全存储 API 密钥

@@ -30,17 +30,28 @@ function Read-Default([string]$prompt, [string]$defaultValue) {
   return $v
 }
 
-$baseUrl = Read-Default 'Grok base URL' ($existing.base_url)
-if (-not $baseUrl) { $baseUrl = 'https://your-grok-endpoint.example' }
+$apiUrl = Read-Default 'Grok API URL (optional, full endpoint)' ($existing.api_url)
 
-$apiKey = Read-Default 'Grok API key' ($existing.api_key)
+$baseUrl = Read-Default 'Grok base URL (fallback)' ($existing.base_url)
+if (-not $baseUrl) { $baseUrl = 'http://localhost:8080' }
+
+$apiKeyDefault = $existing.api_key
+if (-not $apiKeyDefault) {
+  if ($env:GROK_API_KEY) {
+    $apiKeyDefault = $env:GROK_API_KEY
+  } elseif ($env:GROK2API_API_KEY) {
+    $apiKeyDefault = $env:GROK2API_API_KEY
+  }
+}
+$apiKey = Read-Default 'Grok API key (optional if server auth disabled)' ($apiKeyDefault)
 $model = Read-Default 'Model' ($existing.model)
-if (-not $model) { $model = 'grok-2-latest' }
+if (-not $model) { $model = 'grok-4' }
 
 $timeout = Read-Default 'Timeout seconds' ([string]($existing.timeout_seconds))
 if (-not $timeout) { $timeout = '60' }
 
 $config = [ordered]@{
+  api_url = $apiUrl
   base_url = $baseUrl
   api_key = $apiKey
   model = $model

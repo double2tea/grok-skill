@@ -1,9 +1,9 @@
 {
-  "base_url": "https://grok.lvli.de",
-  "api_key": "asd3865373",
-  "model": "grok-4.1-thinking",
-  "timeout_seconds": 120,
+  "api_url": "http://localhost:8080/v1/chat/completions",
+  "base_url": "http://localhost:8080",
+  "api_key": "YOUR_API_KEY",
+  "model": "grok-4",
+  "timeout_seconds": 60,
   "extra_body": {},
   "extra_headers": {}
 }
-

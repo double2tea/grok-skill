@@ -5,6 +5,7 @@ import re
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from typing import Any
 
@@ -35,7 +36,7 @@ def _normalize_api_key(api_key: str) -> str:
     if not api_key:
         return ""
     placeholder = {"YOUR_API_KEY", "API_KEY", "CHANGE_ME", "REPLACE_ME"}
-    if api_key.upper() in placeholder:
+    if api_key.upper() in {item.upper() for item in placeholder}:
         return ""
     return api_key
 
@@ -51,9 +52,25 @@ def _normalize_base_url_value(base_url: str) -> str:
         "CHANGE_ME",
         "REPLACE_ME",
     }
-    if base_url.upper() in placeholder:
+    if base_url.upper() in {item.upper() for item in placeholder}:
         return ""
     return base_url
+
+
+def _normalize_api_url_value(api_url: str) -> str:
+    api_url = api_url.strip()
+    if not api_url:
+        return ""
+    placeholder = {
+        "https://your-grok-endpoint.example/v1/chat/completions",
+        "YOUR_API_URL",
+        "API_URL",
+        "CHANGE_ME",
+        "REPLACE_ME",
+    }
+    if api_url.upper() in {item.upper() for item in placeholder}:
+        return ""
+    return api_url
 
 
 def _load_json_file(path: str) -> dict[str, Any]:
@@ -72,6 +89,25 @@ def _normalize_base_url(base_url: str) -> str:
     if base_url.endswith("/v1"):
         return base_url[: -len("/v1")]
     return base_url
+
+
+def _resolve_chat_completions_url(*, api_url: str, base_url: str) -> str:
+    normalized_api_url = api_url.strip().rstrip("/")
+    if normalized_api_url:
+        parsed = urllib.parse.urlparse(normalized_api_url)
+        path = parsed.path.rstrip("/")
+        if path.endswith("/chat/completions"):
+            return normalized_api_url
+        if path.endswith("/v1"):
+            return f"{normalized_api_url}/chat/completions"
+        if not path or path == "/":
+            return f"{normalized_api_url}/v1/chat/completions"
+        return normalized_api_url
+
+    normalized_base_url = _normalize_base_url(base_url)
+    if normalized_base_url:
+        return f"{normalized_base_url}/v1/chat/completions"
+    return ""
 
 
 def _coerce_json_object(text: str) -> dict[str, Any] | None:
@@ -121,7 +157,7 @@ def _parse_json_object(raw: str, *, label: str) -> dict[str, Any]:
 
 def _request_chat_completions(
     *,
-    base_url: str,
+    request_url: str,
     api_key: str,
     model: str,
     query: str,
@@ -129,8 +165,6 @@ def _request_chat_completions(
     extra_headers: dict[str, Any],
     extra_body: dict[str, Any],
 ) -> dict[str, Any]:
-    url = f"{_normalize_base_url(base_url)}/v1/chat/completions"
-
     system = (
         "You are a web research assistant. Use live web search/browsing when answering. "
         "Return ONLY a single JSON object with keys: "
@@ -151,13 +185,14 @@ def _request_chat_completions(
 
     headers: dict[str, str] = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {api_key}",
     }
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
     for key, value in extra_headers.items():
         headers[str(key)] = str(value)
 
     req = urllib.request.Request(
-        url=url,
+        url=request_url,
         data=_compact_json(body).encode("utf-8"),
         headers=headers,
         method="POST",
@@ -171,6 +206,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Aggressive web research via OpenAI-compatible Grok endpoint.")
     parser.add_argument("--query", required=True, help="Search query / research task.")
     parser.add_argument("--config", default="", help="Path to config JSON file.")
+    parser.add_argument("--api-url", default="", help="Override full API URL. Accepts host, /v1, or /v1/chat/completions.")
     parser.add_argument("--base-url", default="", help="Override base URL.")
     parser.add_argument("--api-key", default="", help="Override API key.")
     parser.add_argument("--model", default="", help="Override model.")
@@ -229,13 +265,31 @@ def main() -> int:
         if not config_path:
             config_path = _default_skill_config_paths()[0]
 
+    api_url = _normalize_api_url_value(
+        args.api_url.strip()
+        or os.environ.get("GROK_API_URL", "").strip()
+        or str(config.get("api_url") or "").strip()
+    )
     base_url = _normalize_base_url_value(
-        args.base_url.strip() or os.environ.get("GROK_BASE_URL", "").strip() or str(config.get("base_url") or "").strip()
+        args.base_url.strip()
+        or os.environ.get("GROK_BASE_URL", "").strip()
+        or os.environ.get("GROK2API_BASE_URL", "").strip()
+        or str(config.get("base_url") or "").strip()
     )
+    request_url = _resolve_chat_completions_url(api_url=api_url, base_url=base_url)
     api_key = _normalize_api_key(
-        args.api_key.strip() or os.environ.get("GROK_API_KEY", "").strip() or str(config.get("api_key") or "").strip()
+        args.api_key.strip()
+        or os.environ.get("GROK_API_KEY", "").strip()
+        or os.environ.get("GROK2API_API_KEY", "").strip()
+        or str(config.get("api_key") or "").strip()
     )
-    model = args.model.strip() or os.environ.get("GROK_MODEL", "").strip() or str(config.get("model") or "").strip() or "grok-2-latest"
+    model = (
+        args.model.strip()
+        or os.environ.get("GROK_MODEL", "").strip()
+        or os.environ.get("GROK2API_MODEL", "").strip()
+        or str(config.get("model") or "").strip()
+        or "grok-4"
+    )
 
     timeout_seconds = args.timeout_seconds
     if not timeout_seconds:
@@ -243,16 +297,9 @@ def main() -> int:
     if not timeout_seconds:
         timeout_seconds = float(config.get("timeout_seconds") or 0) or 60.0
 
-    if not base_url:
+    if not request_url:
         sys.stderr.write(
-            "Missing base URL: set GROK_BASE_URL, write it to config, or pass --base-url\n"
-            f"Config path: {config_path}\n"
-        )
-        return 2
-
-    if not api_key:
-        sys.stderr.write(
-            "Missing API key: set GROK_API_KEY, write it to config, or pass --api-key\n"
+            "Missing API URL: set GROK_API_URL/GROK_BASE_URL, write api_url/base_url to config, or pass --api-url/--base-url\n"
             f"Config path: {config_path}\n"
         )
         return 2
@@ -278,7 +325,7 @@ def main() -> int:
     started = time.time()
     try:
         resp = _request_chat_completions(
-            base_url=base_url,
+            request_url=request_url,
             api_key=api_key,
             model=model,
             query=args.query,
@@ -293,6 +340,7 @@ def main() -> int:
             "error": f"HTTP {getattr(e, 'code', None)}",
             "detail": raw or str(e),
             "config_path": config_path,
+            "request_url": request_url,
             "base_url": base_url,
             "model": model,
             "elapsed_ms": int((time.time() - started) * 1000),
@@ -305,6 +353,7 @@ def main() -> int:
             "error": "request_failed",
             "detail": str(e),
             "config_path": config_path,
+            "request_url": request_url,
             "base_url": base_url,
             "model": model,
             "elapsed_ms": int((time.time() - started) * 1000),
@@ -350,6 +399,7 @@ def main() -> int:
         "ok": True,
         "query": args.query,
         "config_path": config_path,
+        "request_url": request_url,
         "base_url": base_url,
         "model": resp.get("model") or model,
         "content": content,
